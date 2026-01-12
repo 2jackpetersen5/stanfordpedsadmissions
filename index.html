@@ -90,8 +90,8 @@
     const { useState, useEffect } = React;
 
     // Logo URLs - REPLACE THESE WITH ACTUAL LOGO URLs
-    const LPCH_LOGO = "lpch.svg";
-    const SCVMC_LOGO = "scvmc.svg";
+    const LPCH_LOGO = "https://via.placeholder.com/120x120/8B0000/FFFFFF?text=LPCH";
+    const SCVMC_LOGO = "https://via.placeholder.com/120x120/004d99/FFFFFF?text=SCVMC";
 
     const borderColors = { 
       Blue: '#60a5fa', Silver: '#9ca3af', Red: '#f87171', Green: '#4ade80', Yellow: '#facc15',
@@ -108,7 +108,9 @@
     };
 
     function AdmissionTracker() {
-      const [hospital, setHospital] = useState(null);
+      const [hospital, setHospital] = useState(() => {
+        return localStorage.getItem('selectedHospital') || null;
+      });
       const [admissions, setAdmissions] = useState([]);
       const [showForm, setShowForm] = useState(false);
       const [editingId, setEditingId] = useState(null);
@@ -145,6 +147,7 @@
 
       const handleHospitalSelect = (selectedHospital) => {
         setHospital(selectedHospital);
+        localStorage.setItem('selectedHospital', selectedHospital);
         setFormData({
           ...formData,
           service: selectedHospital === 'LPCH' ? 'Blue' : 'Peds Primary'
@@ -183,26 +186,18 @@
         }
       };
 
-  const cycleTaskStatus = async (admissionId, taskKey) => {
-  const admission = admissions.find(a => a.id === admissionId);
-  if (!admission) return;
-  const current = admission.tasks[taskKey];
-  
-  let newStatus;
-  // Skip "prepped" for patientArrived and staffedWithAttending
-  if (taskKey === 'patientArrived' || taskKey === 'staffedWithAttending') {
-    newStatus = current === 'incomplete' ? 'complete' : 'incomplete';
-  } else {
-    newStatus = current === 'incomplete' ? 'prepped' : current === 'prepped' ? 'complete' : 'incomplete';
-  }
-  
-  try {
-    const collectionName = hospital === 'LPCH' ? 'admissions' : 'admissions_scvmc';
-    await db.collection(collectionName).doc(admissionId).update({ [`tasks.${taskKey}`]: newStatus });
-  } catch (error) {
-    console.error(error);
-  }
-};
+      const cycleTaskStatus = async (admissionId, taskKey) => {
+        const admission = admissions.find(a => a.id === admissionId);
+        if (!admission) return;
+        const current = admission.tasks[taskKey];
+        const newStatus = current === 'incomplete' ? 'prepped' : current === 'prepped' ? 'complete' : 'incomplete';
+        try {
+          const collectionName = hospital === 'LPCH' ? 'admissions' : 'admissions_scvmc';
+          await db.collection(collectionName).doc(admissionId).update({ [`tasks.${taskKey}`]: newStatus });
+        } catch (error) {
+          console.error(error);
+        }
+      };
 
       const deleteAdmission = async (id) => {
         if (!confirm('Delete this admission?')) return;
@@ -271,7 +266,10 @@
                   <p className="subtitle">
                     🔄 Live sync - shared with all team members
                     {' · '}
-                    <span className="change-hospital" onClick={() => setHospital(null)}>Change Hospital</span>
+                    <span className="change-hospital" onClick={() => { 
+                      setHospital(null); 
+                      localStorage.removeItem('selectedHospital');
+                    }}>Change Hospital</span>
                   </p>
                 </div>
                 <button onClick={() => setShowForm(!showForm)} className="btn btn-primary">
