@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LPCH Admission Tracker</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    .container { min-height: 100vh; background: linear-gradient(135deg, #e0f2fe 0%, #c7d2fe 100%); padding: 1rem; }
+    .main { max-width: 1280px; margin: 0 auto; }
+    .card { background: white; border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); padding: 1.5rem; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem; }
+    .title { font-size: 1.875rem; font-weight: bold; color: #312e81; }
+    .subtitle { font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem; }
+    .btn { padding: 0.5rem 1rem; border-radius: 0.5rem; border: none; cursor: pointer; font-size: 1rem; display: inline-flex; align-items: center; gap: 0.5rem; transition: all 0.2s; }
+    .btn-primary { background: #4f46e5; color: white; }
+    .btn-primary:hover { background: #4338ca; }
+    .btn-secondary { background: #d1d5db; color: #374151; }
+    .btn-secondary:hover { background: #9ca3af; }
+    .btn-danger { background: rgba(255,255,255,0.7); color: #dc2626; padding: 0.5rem; border-radius: 0.375rem; }
+    .btn-edit { background: rgba(255,255,255,0.7); color: #4f46e5; padding: 0.5rem; border-radius: 0.375rem; }
+    .form-container { background: #eef2ff; padding: 1.5rem; border-radius: 0.5rem; margin-bottom: 1.5rem; }
+    .form-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+    .form-label { display: block; font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 0.25rem; }
+    .form-input, .form-select { width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 0.5rem; font-size: 1rem; }
+    .form-input:focus, .form-select:focus { outline: none; border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,0.1); }
+    .status-msg { margin-bottom: 1rem; padding: 0.75rem; background: #dbeafe; border: 1px solid #93c5fd; border-radius: 0.5rem; font-size: 0.875rem; }
+    .filter-bar { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; align-items: center; }
+    .legend { display: flex; gap: 1rem; font-size: 0.875rem; color: #6b7280; flex-wrap: wrap; }
+    .legend-item { display: flex; align-items: center; gap: 0.25rem; }
+    .legend-icon { width: 1rem; height: 1rem; border-radius: 9999px; display: inline-block; }
+    .admission-card { background: white; border-width: 4px; border-style: solid; border-radius: 0.5rem; padding: 1.25rem; margin-bottom: 1rem; position: relative; overflow: hidden; transition: box-shadow 0.2s; }
+    .admission-card:hover { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+    .admission-bg { position: absolute; inset: 0; opacity: 0.1; font-size: 6rem; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+    .admission-content { position: relative; }
+    .admission-header { display: flex; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem; }
+    .admission-info { flex: 1; }
+    .admission-title { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
+    .admission-name { font-size: 1.125rem; font-weight: 600; color: #111827; }
+    .badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.875rem; font-weight: 500; }
+    .admission-detail { color: #374151; margin-bottom: 0.25rem; }
+    .admission-meta { display: flex; gap: 1rem; font-size: 0.875rem; color: #6b7280; flex-wrap: wrap; }
+    .theme-badge { padding: 0.25rem 0.5rem; border-radius: 0.25rem; background: rgba(255,255,255,0.7); font-size: 0.75rem; }
+    .admission-actions { display: flex; gap: 0.5rem; }
+    .tasks-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; padding-top: 0.75rem; border-top: 2px solid rgba(255,255,255,0.5); }
+    .task-btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; border: none; background: none; cursor: pointer; border-radius: 0.375rem; transition: background 0.2s; text-align: left; }
+    .task-btn:hover { background: rgba(255,255,255,0.5); }
+    .task-icon { width: 1.25rem; height: 1.25rem; border-radius: 9999px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .task-label { font-size: 0.875rem; }
+    .empty-state { text-align: center; padding: 3rem 0; color: #6b7280; }
+    .spinner { animation: spin 1s linear infinite; border-radius: 9999px; height: 3rem; width: 3rem; border: 2px solid transparent; border-top-color: #4f46e5; margin: 0 auto 1rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (min-width: 768px) {
+      .form-grid { grid-template-columns: repeat(2, 1fr); }
+      .tasks-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (min-width: 1024px) {
+      .form-grid { grid-template-columns: repeat(4, 1fr); }
+      .tasks-grid { grid-template-columns: repeat(6, 1fr); }
+    }
+    .col-span-4 { grid-column: span 4; }
+    @media (max-width: 1023px) { .col-span-4 { grid-column: span 2; } }
+    @media (max-width: 767px) { .col-span-4 { grid-column: span 1; } }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const firebaseConfig = {
+      apiKey: "AIzaSyCjUIMBSCWBBDpmCm2jFA7BD7qUkc4lu6g",
+      authDomain: "stanford-peds-admissions.firebaseapp.com",
+      projectId: "stanford-peds-admissions",
+      storageBucket: "stanford-peds-admissions.firebasestorage.app",
+      messagingSenderId: "606724153738",
+      appId: "1:606724153738:web:1e64abdf7a701b0d752873"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const { useState, useEffect } = React;
+
+    const borderColors = { Blue: '#60a5fa', Silver: '#9ca3af', Red: '#f87171', Green: '#4ade80', Yellow: '#facc15' };
+    const badgeColors = { 
+      Blue: { bg: '#dbeafe', text: '#1e40af' },
+      Silver: { bg: '#f3f4f6', text: '#374151' },
+      Red: { bg: '#fee2e2', text: '#991b1b' },
+      Green: { bg: '#d1fae5', text: '#065f46' },
+      Yellow: { bg: '#fef3c7', text: '#92400e' }
+    };
+    const themeEmojis = { 
+      'Monster Trucks': '🚛', 'Dinosaurs': '🦕', 'Birds': '🐦', 'Dogs': '🐕', 
+      'Cats': '🐱', 'Beach': '🏖️', 'Camping': '🏕️', 'Fruit': '🍎', 'Sports': '⚽', 'Space': '🚀'
+    };
+
+    function AdmissionTracker() {
+      const [admissions, setAdmissions] = useState([]);
+      const [showForm, setShowForm] = useState(false);
+      const [editingId, setEditingId] = useState(null);
+      const [filterResident, setFilterResident] = useState('all');
+      const [filterService, setFilterService] = useState('all');
+      const [statusMessage, setStatusMessage] = useState('');
+      const [loading, setLoading] = useState(true);
+      const [formData, setFormData] = useState({
+        initials: '', age: '', gender: '', chiefComplaint: '', resident: '',
+        service: 'Blue', roomNumber: '', theme: 'Monster Trucks',
+        tasks: {
+          patientArrived: 'incomplete', medRecComplete: 'incomplete',
+          ordersPlaced: 'incomplete', staffedWithAttending: 'incomplete',
+          handoffWritten: 'incomplete', noteComplete: 'incomplete'
+        }
+      });
+
+      useEffect(() => {
+        const unsubscribe = db.collection('admissions').orderBy('timestamp', 'desc').onSnapshot((snapshot) => {
+          const list = [];
+          snapshot.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
+          setAdmissions(list);
+          setLoading(false);
+        }, (error) => {
+          console.error('Error:', error);
+          setStatusMessage('❌ Error connecting to database');
+          setLoading(false);
+        });
+        return () => unsubscribe();
+      }, []);
+
+      const handleSubmit = async () => {
+        if (!formData.initials || !formData.age || !formData.gender || !formData.chiefComplaint || !formData.resident || !formData.roomNumber) {
+          setStatusMessage('❌ Please fill in all required fields');
+          setTimeout(() => setStatusMessage(''), 3000);
+          return;
+        }
+        setStatusMessage('💾 Saving...');
+        try {
+          if (editingId) {
+            await db.collection('admissions').doc(editingId).update({...formData, timestamp: firebase.firestore.FieldValue.serverTimestamp()});
+            setEditingId(null);
+          } else {
+            await db.collection('admissions').add({...formData, timestamp: firebase.firestore.FieldValue.serverTimestamp()});
+          }
+          setFormData({
+            initials: '', age: '', gender: '', chiefComplaint: '', resident: '',
+            service: 'Blue', roomNumber: '', theme: 'Monster Trucks',
+            tasks: {
+              patientArrived: 'incomplete', medRecComplete: 'incomplete',
+              ordersPlaced: 'incomplete', staffedWithAttending: 'incomplete',
+              handoffWritten: 'incomplete', noteComplete: 'incomplete'
+            }
+          });
+          setShowForm(false);
+          setStatusMessage('✅ Saved!');
+          setTimeout(() => setStatusMessage(''), 3000);
+        } catch (error) {
+          setStatusMessage('❌ Error: ' + error.message);
+        }
+      };
+
+      const cycleTaskStatus = async (admissionId, taskKey) => {
+        const admission = admissions.find(a => a.id === admissionId);
+        if (!admission) return;
+        const current = admission.tasks[taskKey];
+        const newStatus = current === 'incomplete' ? 'prepped' : current === 'prepped' ? 'complete' : 'incomplete';
+        try {
+          await db.collection('admissions').doc(admissionId).update({ [`tasks.${taskKey}`]: newStatus });
+        } catch (error) {
+          console.error(error);
+        }
+      };
+
+      const deleteAdmission = async (id) => {
+        if (!confirm('Delete this admission?')) return;
+        try {
+          await db.collection('admissions').doc(id).delete();
+          setStatusMessage('✅ Deleted');
+          setTimeout(() => setStatusMessage(''), 3000);
+        } catch (error) {
+          console.error(error);
+        }
+      };
+
+      if (loading) {
+        return (
+          <div className="container" style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+            <div style={{textAlign: 'center'}}>
+              <div className="spinner"></div>
+              <p style={{color: '#6b7280'}}>Loading admissions...</p>
+            </div>
+          </div>
+        );
+      }
+
+      const residents = [...new Set(admissions.map(a => a.resident))].filter(Boolean).sort();
+      const filtered = admissions.filter(a => {
+        const rMatch = filterResident === 'all' || a.resident === filterResident;
+        const sMatch = filterService === 'all' || a.service === filterService;
+        return rMatch && sMatch;
+      });
+
+      return (
+        <div className="container">
+          <div className="main">
+            <div className="card">
+              <div className="header">
+                <div>
+                  <h1 className="title">LPCH Admission Tracker</h1>
+                  <p className="subtitle">🔄 Live sync - shared with all team members</p>
+                </div>
+                <button onClick={() => setShowForm(!showForm)} className="btn btn-primary">
+                  <span style={{fontSize: '1.25rem'}}>+</span> New
+                </button>
+              </div>
+
+              {statusMessage && <div className="status-msg">{statusMessage}</div>}
+
+              {showForm && (
+                <div className="form-container">
+                  <h2 style={{fontSize: '1.125rem', fontWeight: 600, marginBottom: '1rem'}}>
+                    {editingId ? 'Edit' : 'New'} Admission
+                  </h2>
+                  <div className="form-grid">
+                    <div>
+                      <label className="form-label">Initials</label>
+                      <input className="form-input" type="text" placeholder="JD" maxLength="4" value={formData.initials} onChange={(e) => setFormData({...formData, initials: e.target.value.toUpperCase()})} />
+                    </div>
+                    <div>
+                      <label className="form-label">Gender</label>
+                      <select className="form-select" value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})}>
+                        <option value="">Select...</option>
+                        <option value="M">M</option>
+                        <option value="F">F</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="form-label">Age</label>
+                      <input className="form-input" type="text" placeholder="5y" value={formData.age} onChange={(e) => setFormData({...formData, age: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="form-label">Room</label>
+                      <input className="form-input" type="text" placeholder="301" value={formData.roomNumber} onChange={(e) => setFormData({...formData, roomNumber: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="form-label">Service</label>
+                      <select className="form-select" value={formData.service} onChange={(e) => setFormData({...formData, service: e.target.value})}>
+                        <option>Blue</option><option>Silver</option><option>Red</option><option>Green</option><option>Yellow</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="form-label">Resident</label>
+                      <input className="form-input" type="text" value={formData.resident} onChange={(e) => setFormData({...formData, resident: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="form-label">Theme</label>
+                      <select className="form-select" value={formData.theme} onChange={(e) => setFormData({...formData, theme: e.target.value})}>
+                        {Object.keys(themeEmojis).map(t => <option key={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div></div>
+                    <div className="col-span-4">
+                      <label className="form-label">Chief Complaint</label>
+                      <input className="form-input" type="text" value={formData.chiefComplaint} onChange={(e) => setFormData({...formData, chiefComplaint: e.target.value})} />
+                    </div>
+                  </div>
+                  <div style={{display: 'flex', gap: '0.5rem', marginTop: '1rem'}}>
+                    <button onClick={handleSubmit} className="btn btn-primary">{editingId ? 'Save' : 'Add'}</button>
+                    <button onClick={() => { setShowForm(false); setEditingId(null); }} className="btn btn-secondary">Cancel</button>
+                  </div>
+                </div>
+              )}
+
+              <div style={{marginBottom: '1rem'}}>
+                <div className="filter-bar">
+                  <select className="form-select" style={{width: 'auto'}} value={filterResident} onChange={(e) => setFilterResident(e.target.value)}>
+                    <option value="all">All Residents</option>
+                    {residents.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                  <select className="form-select" style={{width: 'auto'}} value={filterService} onChange={(e) => setFilterService(e.target.value)}>
+                    <option value="all">All Services</option>
+                    <option>Blue</option><option>Silver</option><option>Red</option><option>Green</option><option>Yellow</option>
+                  </select>
+                  <span style={{color: '#6b7280'}}>{filtered.length} admission{filtered.length !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="legend">
+                  <div className="legend-item"><span className="legend-icon" style={{border: '2px solid #9ca3af'}}></span> Incomplete</div>
+                  <div className="legend-item"><span className="legend-icon" style={{background: '#facc15'}}></span> Prepped</div>
+                  <div className="legend-item"><span className="legend-icon" style={{background: '#22c55e'}}></span> Complete</div>
+                </div>
+              </div>
+
+              {filtered.length === 0 ? (
+                <div className="empty-state">
+                  <p style={{fontSize: '1.125rem'}}>No admissions yet</p>
+                  <p style={{fontSize: '0.875rem', marginTop: '0.5rem'}}>Click "New" to add one</p>
+                </div>
+              ) : (
+                filtered.map((adm) => (
+                  <div key={adm.id} className="admission-card" style={{borderColor: borderColors[adm.service]}}>
+                    <div className="admission-bg">{themeEmojis[adm.theme]}</div>
+                    <div className="admission-content">
+                      <div className="admission-header">
+                        <div className="admission-info">
+                          <div className="admission-title">
+                            <h3 className="admission-name">{adm.initials} - Room {adm.roomNumber}</h3>
+                            <span className="badge" style={{background: badgeColors[adm.service].bg, color: badgeColors[adm.service].text}}>{adm.service}</span>
+                            <span style={{fontSize: '0.875rem', color: '#6b7280'}}>{adm.age} {adm.gender}</span>
+                          </div>
+                          <p className="admission-detail"><strong>CC:</strong> {adm.chiefComplaint}</p>
+                          <div className="admission-meta">
+                            <span><strong>Resident:</strong> {adm.resident}</span>
+                            <span className="theme-badge">{adm.theme}</span>
+                          </div>
+                        </div>
+                        <div className="admission-actions">
+                          <button onClick={() => { setFormData(adm); setEditingId(adm.id); setShowForm(true); }} className="btn-edit">✏️</button>
+                          <button onClick={() => deleteAdmission(adm.id)} className="btn-danger">🗑️</button>
+                        </div>
+                      </div>
+                      <div className="tasks-grid">
+                        {[
+                          ['patientArrived', 'Arrived'], ['medRecComplete', 'Med Rec'],
+                          ['ordersPlaced', 'Orders'], ['staffedWithAttending', 'Staffed'],
+                          ['handoffWritten', 'Handoff'], ['noteComplete', 'Note']
+                        ].map(([key, label]) => (
+                          <button key={key} onClick={() => cycleTaskStatus(adm.id, key)} className="task-btn">
+                            {adm.tasks[key] === 'complete' ? (
+                              <span className="task-icon" style={{background: '#22c55e', color: 'white', fontSize: '0.75rem'}}>✓</span>
+                            ) : adm.tasks[key] === 'prepped' ? (
+                              <span className="task-icon" style={{background: '#facc15'}}></span>
+                            ) : (
+                              <span className="task-icon" style={{border: '2px solid #9ca3af'}}></span>
+                            )}
+                            <span className="task-label">{label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<AdmissionTracker />, document.getElementById('root'));
+  </script>
+</body>
+</html>
