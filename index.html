@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LPCH Admission Tracker</title>
+  <title>Admission Tracker</title>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -25,6 +25,7 @@
     .btn-secondary:hover { background: #9ca3af; }
     .btn-danger { background: rgba(255,255,255,0.7); color: #dc2626; padding: 0.5rem; border-radius: 0.375rem; }
     .btn-edit { background: rgba(255,255,255,0.7); color: #4f46e5; padding: 0.5rem; border-radius: 0.375rem; }
+    .btn-large { padding: 2rem 3rem; font-size: 1.5rem; font-weight: 600; min-width: 250px; }
     .form-container { background: #eef2ff; padding: 1.5rem; border-radius: 0.5rem; margin-bottom: 1.5rem; }
     .form-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
     .form-label { display: block; font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 0.25rem; }
@@ -55,6 +56,9 @@
     .task-label { font-size: 0.875rem; }
     .empty-state { text-align: center; padding: 3rem 0; color: #6b7280; }
     .spinner { animation: spin 1s linear infinite; border-radius: 9999px; height: 3rem; width: 3rem; border: 2px solid transparent; border-top-color: #4f46e5; margin: 0 auto 1rem; }
+    .hospital-select { text-align: center; padding: 4rem 2rem; }
+    .hospital-buttons { display: flex; gap: 2rem; justify-content: center; flex-wrap: wrap; margin-top: 2rem; }
+    .change-hospital { font-size: 0.875rem; color: #4f46e5; cursor: pointer; text-decoration: underline; }
     @keyframes spin { to { transform: rotate(360deg); } }
     @media (min-width: 768px) {
       .form-grid { grid-template-columns: repeat(2, 1fr); }
@@ -85,13 +89,18 @@
     const db = firebase.firestore();
     const { useState, useEffect } = React;
 
-    const borderColors = { Blue: '#60a5fa', Silver: '#9ca3af', Red: '#f87171', Green: '#4ade80', Yellow: '#facc15' };
+    const borderColors = { 
+      Blue: '#60a5fa', Silver: '#9ca3af', Red: '#f87171', Green: '#4ade80', Yellow: '#facc15',
+      'Peds Primary': '#60a5fa', 'Peds Consulting': '#a78bfa'
+    };
     const badgeColors = { 
       Blue: { bg: '#dbeafe', text: '#1e40af' },
       Silver: { bg: '#f3f4f6', text: '#374151' },
       Red: { bg: '#fee2e2', text: '#991b1b' },
       Green: { bg: '#d1fae5', text: '#065f46' },
-      Yellow: { bg: '#fef3c7', text: '#92400e' }
+      Yellow: { bg: '#fef3c7', text: '#92400e' },
+      'Peds Primary': { bg: '#dbeafe', text: '#1e40af' },
+      'Peds Consulting': { bg: '#ede9fe', text: '#5b21b6' }
     };
     const themeEmojis = { 
       'Monster Trucks': '🚛', 'Dinosaurs': '🦕', 'Birds': '🐦', 'Dogs': '🐕', 
@@ -99,16 +108,17 @@
     };
 
     function AdmissionTracker() {
+      const [hospital, setHospital] = useState(null);
       const [admissions, setAdmissions] = useState([]);
       const [showForm, setShowForm] = useState(false);
       const [editingId, setEditingId] = useState(null);
       const [filterResident, setFilterResident] = useState('all');
       const [filterService, setFilterService] = useState('all');
       const [statusMessage, setStatusMessage] = useState('');
-      const [loading, setLoading] = useState(true);
+      const [loading, setLoading] = useState(false);
       const [formData, setFormData] = useState({
         initials: '', age: '', gender: '', chiefComplaint: '', resident: '',
-        service: 'Blue', roomNumber: '', theme: 'Monster Trucks',
+        service: '', roomNumber: '', theme: 'Monster Trucks',
         tasks: {
           patientArrived: 'incomplete', medRecComplete: 'incomplete',
           ordersPlaced: 'incomplete', staffedWithAttending: 'incomplete',
@@ -117,7 +127,10 @@
       });
 
       useEffect(() => {
-        const unsubscribe = db.collection('admissions').orderBy('timestamp', 'desc').onSnapshot((snapshot) => {
+        if (!hospital) return;
+        setLoading(true);
+        const collectionName = hospital === 'LPCH' ? 'admissions' : 'admissions_scvmc';
+        const unsubscribe = db.collection(collectionName).orderBy('timestamp', 'desc').onSnapshot((snapshot) => {
           const list = [];
           snapshot.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
           setAdmissions(list);
@@ -128,7 +141,15 @@
           setLoading(false);
         });
         return () => unsubscribe();
-      }, []);
+      }, [hospital]);
+
+      const handleHospitalSelect = (selectedHospital) => {
+        setHospital(selectedHospital);
+        setFormData({
+          ...formData,
+          service: selectedHospital === 'LPCH' ? 'Blue' : 'Peds Primary'
+        });
+      };
 
       const handleSubmit = async () => {
         if (!formData.initials || !formData.age || !formData.gender || !formData.chiefComplaint || !formData.resident || !formData.roomNumber) {
@@ -138,15 +159,16 @@
         }
         setStatusMessage('💾 Saving...');
         try {
+          const collectionName = hospital === 'LPCH' ? 'admissions' : 'admissions_scvmc';
           if (editingId) {
-            await db.collection('admissions').doc(editingId).update({...formData, timestamp: firebase.firestore.FieldValue.serverTimestamp()});
+            await db.collection(collectionName).doc(editingId).update({...formData, timestamp: firebase.firestore.FieldValue.serverTimestamp()});
             setEditingId(null);
           } else {
-            await db.collection('admissions').add({...formData, timestamp: firebase.firestore.FieldValue.serverTimestamp()});
+            await db.collection(collectionName).add({...formData, timestamp: firebase.firestore.FieldValue.serverTimestamp()});
           }
           setFormData({
             initials: '', age: '', gender: '', chiefComplaint: '', resident: '',
-            service: 'Blue', roomNumber: '', theme: 'Monster Trucks',
+            service: hospital === 'LPCH' ? 'Blue' : 'Peds Primary', roomNumber: '', theme: 'Monster Trucks',
             tasks: {
               patientArrived: 'incomplete', medRecComplete: 'incomplete',
               ordersPlaced: 'incomplete', staffedWithAttending: 'incomplete',
@@ -167,7 +189,8 @@
         const current = admission.tasks[taskKey];
         const newStatus = current === 'incomplete' ? 'prepped' : current === 'prepped' ? 'complete' : 'incomplete';
         try {
-          await db.collection('admissions').doc(admissionId).update({ [`tasks.${taskKey}`]: newStatus });
+          const collectionName = hospital === 'LPCH' ? 'admissions' : 'admissions_scvmc';
+          await db.collection(collectionName).doc(admissionId).update({ [`tasks.${taskKey}`]: newStatus });
         } catch (error) {
           console.error(error);
         }
@@ -176,13 +199,37 @@
       const deleteAdmission = async (id) => {
         if (!confirm('Delete this admission?')) return;
         try {
-          await db.collection('admissions').doc(id).delete();
+          const collectionName = hospital === 'LPCH' ? 'admissions' : 'admissions_scvmc';
+          await db.collection(collectionName).doc(id).delete();
           setStatusMessage('✅ Deleted');
           setTimeout(() => setStatusMessage(''), 3000);
         } catch (error) {
           console.error(error);
         }
       };
+
+      if (!hospital) {
+        return (
+          <div className="container">
+            <div className="main">
+              <div className="card">
+                <div className="hospital-select">
+                  <h1 className="title" style={{marginBottom: '1rem'}}>Select Hospital</h1>
+                  <p style={{color: '#6b7280', marginBottom: '2rem'}}>Choose which hospital you're admitting at</p>
+                  <div className="hospital-buttons">
+                    <button onClick={() => handleHospitalSelect('LPCH')} className="btn btn-primary btn-large">
+                      🏥 LPCH
+                    </button>
+                    <button onClick={() => handleHospitalSelect('SCVMC')} className="btn btn-primary btn-large">
+                      🏥 SCVMC
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
 
       if (loading) {
         return (
@@ -202,14 +249,22 @@
         return rMatch && sMatch;
       });
 
+      const serviceOptions = hospital === 'LPCH' 
+        ? ['Blue', 'Silver', 'Red', 'Green', 'Yellow']
+        : ['Peds Primary', 'Peds Consulting'];
+
       return (
         <div className="container">
           <div className="main">
             <div className="card">
               <div className="header">
                 <div>
-                  <h1 className="title">LPCH Admission Tracker</h1>
-                  <p className="subtitle">🔄 Live sync - shared with all team members</p>
+                  <h1 className="title">{hospital} Admission Tracker</h1>
+                  <p className="subtitle">
+                    🔄 Live sync - shared with all team members
+                    {' · '}
+                    <span className="change-hospital" onClick={() => setHospital(null)}>Change Hospital</span>
+                  </p>
                 </div>
                 <button onClick={() => setShowForm(!showForm)} className="btn btn-primary">
                   <span style={{fontSize: '1.25rem'}}>+</span> New
@@ -246,9 +301,9 @@
                       <input className="form-input" type="text" placeholder="301" value={formData.roomNumber} onChange={(e) => setFormData({...formData, roomNumber: e.target.value})} />
                     </div>
                     <div>
-                      <label className="form-label">Service</label>
+                      <label className="form-label">{hospital === 'LPCH' ? 'Service' : 'Team'}</label>
                       <select className="form-select" value={formData.service} onChange={(e) => setFormData({...formData, service: e.target.value})}>
-                        <option>Blue</option><option>Silver</option><option>Red</option><option>Green</option><option>Yellow</option>
+                        {serviceOptions.map(s => <option key={s}>{s}</option>)}
                       </select>
                     </div>
                     <div>
@@ -281,8 +336,8 @@
                     {residents.map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
                   <select className="form-select" style={{width: 'auto'}} value={filterService} onChange={(e) => setFilterService(e.target.value)}>
-                    <option value="all">All Services</option>
-                    <option>Blue</option><option>Silver</option><option>Red</option><option>Green</option><option>Yellow</option>
+                    <option value="all">{hospital === 'LPCH' ? 'All Services' : 'All Teams'}</option>
+                    {serviceOptions.map(s => <option key={s}>{s}</option>)}
                   </select>
                   <span style={{color: '#6b7280'}}>{filtered.length} admission{filtered.length !== 1 ? 's' : ''}</span>
                 </div>
