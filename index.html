@@ -186,18 +186,26 @@
         }
       };
 
-      const cycleTaskStatus = async (admissionId, taskKey) => {
-        const admission = admissions.find(a => a.id === admissionId);
-        if (!admission) return;
-        const current = admission.tasks[taskKey];
-        const newStatus = current === 'incomplete' ? 'prepped' : current === 'prepped' ? 'complete' : 'incomplete';
-        try {
-          const collectionName = hospital === 'LPCH' ? 'admissions' : 'admissions_scvmc';
-          await db.collection(collectionName).doc(admissionId).update({ [`tasks.${taskKey}`]: newStatus });
-        } catch (error) {
-          console.error(error);
-        }
-      };
+     const cycleTaskStatus = async (admissionId, taskKey) => {
+  const admission = admissions.find(a => a.id === admissionId);
+  if (!admission) return;
+  const current = admission.tasks[taskKey];
+  
+  let newStatus;
+  // Skip "prepped" for patientArrived and staffedWithAttending
+  if (taskKey === 'patientArrived' || taskKey === 'staffedWithAttending') {
+    newStatus = current === 'incomplete' ? 'complete' : 'incomplete';
+  } else {
+    newStatus = current === 'incomplete' ? 'prepped' : current === 'prepped' ? 'complete' : 'incomplete';
+  }
+  
+  try {
+    const collectionName = hospital === 'LPCH' ? 'admissions' : 'admissions_scvmc';
+    await db.collection(collectionName).doc(admissionId).update({ [`tasks.${taskKey}`]: newStatus });
+  } catch (error) {
+    console.error(error);
+  }
+};
 
       const deleteAdmission = async (id) => {
         if (!confirm('Delete this admission?')) return;
