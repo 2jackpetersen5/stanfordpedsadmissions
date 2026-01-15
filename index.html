@@ -370,7 +370,7 @@
                         <div className="admission-info">
                           <div className="admission-title">
                             <h3 className="admission-name">{adm.initials} - Room {adm.roomNumber}</h3>
-                            <span className="badge" style={{background: badgeColors[adm.service].bg, color: badgeColors[adm.service].text}}>{adm.service}</span>
+                            <span className="badge" style={{background: badgeColors[adm.service]?.bg || '#e5e7eb', color: badgeColors[adm.service]?.text || '#374151'}}>{adm.service}</span>
                             <span style={{fontSize: '0.875rem', color: '#6b7280'}}>{adm.age} {adm.gender}</span>
                           </div>
                           <p className="admission-detail"><strong>CC:</strong> {adm.chiefComplaint}</p>
