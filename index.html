@@ -223,7 +223,7 @@
   
   try {
     const collectionName = hospital === 'LPCH' ? 'admissions' : 'admissions_scvmc';
-    await db.collection(collectionName).doc(admissionId).update({ [`tasks.${taskKey}`]: newStatus });
+    await db.collection(collectionName).doc(admissionId).update({[`tasks.${taskKey}`]: newStatus });
   } catch (error) {
     console.error(error);
   }
