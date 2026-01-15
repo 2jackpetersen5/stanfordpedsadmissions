@@ -188,38 +188,38 @@
       };
 
       const cycleTaskStatus = async (admissionId, taskKey) => {
-        const admission = admissions.find(a => a.id === admissionId);
-        if (!admission) return;
-        const current = admission.tasks[taskKey];
-        
-        let newStatus;
-        // Skip "prepped" for patientArrived and staffedWithAttending
-        if (taskKey === 'patientArrived' || taskKey === 'staffedWithAttending') {
-          newStatus = current === 'incomplete' ? 'complete' : 'incomplete';
-        } else {
-          newStatus = current === 'incomplete' ? 'prepped' : current === 'prepped' ? 'complete' : 'incomplete';
-        }
-        
-        try {
-          const collectionName = hospital === 'LPCH' ? 'admissions' : 'admissions_scvmc';
-          await db.collection(collectionName).doc(admissionId).update({[`tasks.${taskKey}`]: newStatus });
-          
-          // Check if all tasks are complete after update
-          const updatedTasks = { ...admission.tasks, [taskKey]: newStatus };
-          const allComplete = Object.values(updatedTasks).every(status => status === 'complete');
-          
-          if (allComplete) {
-            // Trigger confetti!
-            confetti({
-              particleCount: 100,
-              spread: 70,
-              origin: { y: 0.6 }
-            });
-          }
-        } catch (error) {
-          console.error(error);
-        }
-      };
+  const admission = admissions.find(a => a.id === admissionId);
+  if (!admission) return;
+  const current = admission.tasks[taskKey];
+  
+  let newStatus;
+  if (taskKey === 'patientArrived' || taskKey === 'staffedWithAttending') {
+    newStatus = current === 'incomplete' ? 'complete' : 'incomplete';
+  } else {
+    newStatus = current === 'incomplete' ? 'prepped' : current === 'prepped' ? 'complete' : 'incomplete';
+  }
+  
+  try {
+    const collectionName = hospital === 'LPCH' ? 'admissions' : 'admissions_scvmc';
+    const updateKey = 'tasks.' + taskKey;
+    const updateData = {};
+    updateData[updateKey] = newStatus;
+    await db.collection(collectionName).doc(admissionId).update(updateData);
+    
+    const updatedTasks = { ...admission.tasks, [taskKey]: newStatus };
+    const allComplete = Object.values(updatedTasks).every(status => status === 'complete');
+    
+    if (allComplete) {
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 }
+      });
+    }
+  } catch (error) {
+    console.error(error);
+  }
+};
   
   try {
     const collectionName = hospital === 'LPCH' ? 'admissions' : 'admissions_scvmc';
