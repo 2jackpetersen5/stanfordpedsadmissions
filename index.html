@@ -202,7 +202,7 @@
         
         try {
           const collectionName = hospital === 'LPCH' ? 'admissions' : 'admissions_scvmc';
-          await db.collection(collectionName).doc(admissionId).update({ [`tasks.${taskKey}`]: newStatus });
+          await db.collection(collectionName).doc(admissionId).update({[`tasks.${taskKey}`]: newStatus });
           
           // Check if all tasks are complete after update
           const updatedTasks = { ...admission.tasks, [taskKey]: newStatus };
